@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Load profile
+. /etc/profile
+. ~/.bashrc
+
+export PATH=$PATH:/home/aws/aws/env/bin/
+
 if [ -z $BACKUP_INTERVAL ]
 then
 	export BACKUP_INTERVAL=300
@@ -45,7 +51,20 @@ do
 	if [ ! -z $AWS_ACCESS_KEY_ID ]
 	then
 		aws glacier upload-archive --account-id - --vault-name sauvegardes_techniques --body $BACKUP_FILE
+		RC=$?
+		if [ "$RC" != "0" ]
+		then
+			echo "Erreur lors de l'upload aws"
+			exit 1
+		fi
 	fi
 	echo "Attente $BACKUP_INTERVAL secondes"
 	sleep $BACKUP_INTERVAL
+	RC=$?
+	if [ "$RC" != "0" ]
+	then
+		echo "Interupted"
+		exit $RC
+	fi
+
 done
