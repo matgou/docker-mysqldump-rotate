@@ -74,13 +74,48 @@ do
 	fi
 	if [ ! -z $AWS_ACCESS_KEY_ID ]
 	then
-		aws glacier upload-archive --account-id - --vault-name $AWS_VAULT_NAME --body $BACKUP_FILE
+		json=$(aws glacier upload-archive --account-id - --vault-name $AWS_VAULT_NAME --body $BACKUP_FILE)
 		RC=$?
 		if [ "$RC" != "0" ]
 		then
 			echo "Erreur lors de l'upload aws"
 			exit 1
 		fi
+		archiveId=$(echo $json | jq .archiveId | sed 's/"//g')
+		echo "archiveId=$archiveId"
+		mkdir -p /backup/retentionDB/ 2>/dev/null
+		echo $archiveId > /backup/retentionDB/$archiveId
+		# Par default on garde l'archive 1 journée chez aws
+		touch -t `echo $(date +%Y%m%d%H%M -d "1 day")` /backup/retentionDB/$archiveId
+		# Recherche si une archive mensuelle existe
+		date_1st_3month=$(date +%Y-%m-01 -d "3 month")
+		date_2nd_3month=$(date +%Y-%m-02 -d "3 month")
+		echo find /backup/retentionDB -type f -newerat $date_1st_3month "!" -newerat $date_2nd_3month
+		archiveId_monthly=$(find /backup/retentionDB -type f -newerat $date_1st_3month "!" -newerat $date_2nd_3month)
+		echo "Archive mensuelle = $archiveId_monthly"
+		if [ "$archiveId_monthly" == "" ]
+		then
+			echo "Utilisation de l'archive comme archive mensuelle"
+			touch -t `echo $(date +%Y%m01 -d "3 month")0800` /backup/retentionDB/$archiveId
+		fi
+		# Recherche si une archive mensuelle existe
+		date_1st_annu=$(date +%Y-01-01 -d "3 years")
+		date_2nd_annu=$(date +%Y-01-02 -d "3 years")
+		echo find /backup/retentionDB -type f -newerat $date_1st_annu "!" -newerat $date_2nd_annu
+		archiveId_annualy=$( find /backup/retentionDB -type f -newerat $date_1st_annu "!" -newerat $date_2nd_annu)
+		echo "Archive annuelle = $archiveId_annualy"
+		if [ "$archiveId_annualy" == "" ]
+		then
+			echo "Utilisation de l'archive comme archive annuelle"
+			touch -t `echo $(date +%Y0101 -d "3 years")0800` /backup/retentionDB/$archiveId
+		fi
+
+		# Suppression des anciennes archives dans glacier
+		find /backup/retentionDB -type f -atime +0 | while read file
+		do
+			echo "Suppression dans glacier de $file"
+			aws glacier delete-archive --account-id - --vault-name $AWS_VAULT_NAME --archive-id $(cat $file)
+		done
 	fi
 	echo "Attente $BACKUP_INTERVAL secondes"
 	sleep $BACKUP_INTERVAL

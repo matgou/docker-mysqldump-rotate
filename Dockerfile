@@ -9,6 +9,7 @@ RUN apt-get install -y \
     man \
     ssh \
     python \
+    jq \
     python-pip \
     python-virtualenv \
     vim
