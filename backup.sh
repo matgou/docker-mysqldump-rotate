@@ -74,7 +74,7 @@ do
 	fi
 	if [ ! -z $AWS_ACCESS_KEY_ID ]
 	then
-		json=$(aws glacier upload-archive --account-id - --vault-name $AWS_VAULT_NAME --body $BACKUP_FILE)
+		json=$(aws glacier upload-archive --account-id - --vault-name $AWS_VAULT_NAME --archive-description "Sauvegarde DUMP de $MYSQL_DATABASE - $TH" --body $BACKUP_FILE)
 		RC=$?
 		if [ "$RC" != "0" ]
 		then
